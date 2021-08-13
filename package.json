@@ -4,6 +4,7 @@
 	"description": "Implement your php interfaces/abstract classes faster",
 	"version": "1.0.0",
 	"publisher": "coozieki",
+    "icon": "images/php_icon.png",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/coozieki/php-implementor.git"
