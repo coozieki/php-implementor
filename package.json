@@ -1,6 +1,6 @@
 {
-	"name": "php-implement",
-	"displayName": "php_implement",
+	"name": "php-implementor",
+	"displayName": "php_implementor",
 	"description": "Implement your php interfaces/abstract classes faster",
 	"version": "1.0.0",
 	"engines": {
@@ -10,21 +10,34 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:php-implement.helloWorld"
+		"onCommand:php-implement.implement"
 	],
 	"main": "./extension.js",
 	"contributes": {
+		"configuration": [
+			{
+				"title": "PHP Implementor",
+				"properties": {
+					"php-implementor.autoloads": {
+						"type": "object",
+						"default": {},
+						"description": "Configure paths of root namespaces",
+						"scope": "resource"
+					}
+				}
+			}
+		],
 		"menus": {
 			"editor/context": [
 				{
 					"when": "editorLangId == php",
-					"command": "php-implement.helloWorld"
+					"command": "php-implement.implement"
 				}
 			]
 		},
 		"commands": [
 			{
-				"command": "php-implement.helloWorld",
+				"command": "php-implement.implement",
 				"title": "Implement abstract methods"
 			}
 		]

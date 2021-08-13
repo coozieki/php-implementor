@@ -7,30 +7,37 @@ const vscode = require('vscode');
 
 var editor = vscode.window.activeTextEditor;
 var doc = editor.document;
+var paths = {};
 
 /**
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
+	function setConfiguration() {
+		paths = vscode.workspace.getConfiguration().get('php-implementor.autoloads');
+	}
+
 	vscode.window.onDidChangeActiveTextEditor(() => {
-		editor = vscode.window.activeTextEditor;
-		doc = editor.document;
+		if (vscode.window.activeTextEditor !== undefined) {
+			editor = vscode.window.activeTextEditor;
+			doc = editor.document;
+		}
 	});
 
 	vscode.window.onDidChangeVisibleTextEditors(() => {
-		editor = vscode.window.activeTextEditor;
-		doc = editor.document;
+		if (vscode.window.activeTextEditor !== undefined) {
+			editor = vscode.window.activeTextEditor;
+			doc = editor.document;
+		}
 	});
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
 
+	vscode.workspace.onDidChangeConfiguration(() => {
+		setConfiguration();
+	});
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('php-implement.helloWorld', async function () {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
+	setConfiguration();
+
+	let disposable = vscode.commands.registerCommand('php-implement.implement', async function () {
 		var offset = doc.getText().indexOf("{");
 		var pos = doc.positionAt(offset + 1);
 
@@ -43,52 +50,88 @@ function activate(context) {
 async function insertSnippet(pos) {
 	var text = "";
 	var parents = getAllParents(doc.getText()).then(parents => {
+		var methodsCount = 0;
 		parents.forEach(parent => {
 			parent.methods.forEach(method => {
-				text += "\n\t" + method.declaration + "\n\t{\n\t\t//Implementation\n\t}\n\t";
+				text += "\n\t" + method.declaration + "\n\t{\n\t\tthrow new \\Exception(\"Method not implemented\");\n\t}\n\t";
+				methodsCount++;
 			});
 		});
 		editor.insertSnippet(new vscode.SnippetString(text.replaceAll('$', '\\$')), pos);
 
-		vscode.window.showInformationMessage('Implemented ' + parents.length + ' methods!');
+		vscode.window.showInformationMessage('Implemented ' + methodsCount + ' methods!');
 	});
 
 	return;
 }
 
-function getNamespaceOfCurrentFile() {
-	var text = doc.getText();
-
+function getNamespaceOfFile(text) {
 	var nI = text.indexOf('namespace');
 	var namespace = text.substring(nI+9, text.indexOf(";", nI)).trim();
 
 	return namespace;
 }
 
-async function getAllParents(text, result = []) {
-	var eI = text.indexOf('extends');
-
-	if (eI === -1)
-		return result;
-
-	var className = text.substring(eI+7, text.indexOf('implements') !== -1 ? text.indexOf('implements') : text.indexOf("{", eI)).trim();
+function getClassWithNamespace(className, text) {
 	var matches = text.match(new RegExp(`use.*${className};`));
 
 	var match;
 	if (!matches)
-		match = getNamespaceOfCurrentFile() + "\\" + className;
+		match = getNamespaceOfFile(text) + "\\" + className;
 	else 
 		match = matches[0].replace('use', '').replace(';', '').trim();
 
-	var parentText = await getFileText(match);
-	await getAllParents(parentText, result);
-	
-	result.push({
-		parent: match,
-		methods: getAbstractMethods(parentText)
-	});
+	return match;
+}
 
+async function getAllParents(text, result = []) {
+	var eI = text.indexOf('extends');
+	var impI = text.indexOf('implements');
+
+	if (eI === -1 && impI === -1)
+		return result;
+
+	var parents = [];
+	if (eI !== -1) {
+		var classes = text.substring(eI+7, impI !== -1 ? impI : text.indexOf("{", eI)).trim();
+		while(classes.indexOf(' ') !== -1) {
+			classes = classes.replaceAll(' ', '');
+		}
+	
+		classes = classes.split(',');
+
+		classes.forEach($class => {
+			parents.push(getClassWithNamespace($class, text));
+		});
+	}
+	if (impI !== -1) {
+		var interfaces = text.substring(impI+10, text.indexOf("{", impI)).trim();
+		while(interfaces.indexOf(' ') !== -1) {
+			interfaces = interfaces.replaceAll(' ', '');
+		}
+
+		interfaces = interfaces.split(',');
+
+		interfaces.forEach(interface => {
+			parents.push(getClassWithNamespace(interface, text));
+		});
+	}
+
+		
+	for (const parent of parents) {
+		var parentText = await getFileText(parent);
+
+		await getAllParents(parentText, result);
+	
+		result.push({
+			parent: parent,
+			methods: getAbstractMethods(parentText)
+		});
+	}
+	
 	var implementedMethods = getImplementedMethods(text);
+
+	console.log(implementedMethods);
 
 	result.forEach((parent, resultIndex) => {
 		result[resultIndex].methods = parent.methods.filter((method) => {
@@ -103,7 +146,7 @@ async function getAllParents(text, result = []) {
 
 function getImplementedMethods(text) {
 	var methods = [];
-	var matches = text.matchAll(/(?<=\s)(((public)|(static)|(protected)|(private)|(final))\s+)*function[^\n;]*\([^\)]*\)[^{]*(?={)/gs);
+	var matches = text.matchAll(/(?<=\s)(((public)|(static)|(protected)|(private)|(final))\s+)*function[^\n;]*\([^\)]*\)[^{\(\)]*(?={)/gs);
 	Array.from(matches).forEach((val) => {
 		var func = val[0];
 		methods.push({
@@ -116,8 +159,8 @@ function getImplementedMethods(text) {
 }
 
 function getAbstractMethods(text) {	
-	var methods = [];
-	var matches = text.matchAll(/(?<=\s)(((public)|(static)|(protected)|(private))\s+)*abstract[^\n;]*function[^\n;]*\([^\)]*\)[\s\:\w]*(?=;)/gs);
+	var methods = []; 
+	var matches = text.matchAll(/(?<=\s)(((public)|(static)|(protected)|(private)|(abstract))\s+)*function[^\n;]*\([^\)]*\)[\s\:\w]*(?=;)/gs);
 	Array.from(matches).forEach((val) => {
 		var func = val[0];
 		methods.push({
@@ -132,8 +175,21 @@ function getAbstractMethods(text) {
 async function getFileText(namespace) {
 	var text;
     var workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri).uri.fsPath;
-	var file = vscode.Uri.file(workspaceFolder + "/" + namespace.replaceAll("\\", "/") + '.php');
-	text = await vscode.workspace.fs.readFile(file).then((data) => data.toString());
+
+	for(var prop in paths) {
+		namespace = namespace.replace(prop, paths[prop]);
+	}
+
+	namespace = namespace.replaceAll("\\", "/").replaceAll('//', '/');
+	var filepath = workspaceFolder + "/" + namespace + '.php';
+
+	var file = vscode.Uri.file(filepath);
+
+	try {
+		text = await vscode.workspace.fs.readFile(file).then((data) => data.toString());
+	} catch(e) {
+		vscode.window.showErrorMessage(`File at path \"${filepath}\" not found! Try changing extension configuration.`);
+	}
 
 	return text;
 }
