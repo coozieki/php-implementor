@@ -1,7 +1,16 @@
 # Change Log
 
-## [1.0.0] - [1.0.4]
-- Minor readme.md and manifest changes
+## [1.3.0]
+### Added
+- Support for all type of **use..** declarations
+
+### Fixed
+- Error when no method is picked to be implemented
+
+## [1.2.0]
+### Changed
+- Now user can choose which methods to implement
+- Updated demonstration gif in readme.md 
 
 ## [1.1.0]
 ### Added
@@ -13,7 +22,6 @@
 - Bug with initialization when no text editor is active
 - Changed context menu group to "modifications"
 
-## [1.2.0]
-### Changed
-- Now user can choose which methods to implement
-- Updated demonstration gif in readme.md 
+## [1.0.0] - [1.0.4]
+- Minor readme.md and manifest changes
+

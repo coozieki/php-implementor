@@ -66,6 +66,8 @@ async function insertSnippet(pos) {
 			title: "Choose methods to implement",
 			placeHolder: "Choose methods"
 		}).then(pickedMethods => {
+			if (pickedMethods === undefined)
+				return; 
 			pickedMethods.forEach(method => {
 				text += "\n\t" + method + "\n\t{\n\t\tthrow new \\Exception(\"Method not implemented\");\n\t}\n\t";
 			});
@@ -84,14 +86,50 @@ function getNamespaceOfFile(text) {
 	return namespace;
 }
 
-function getClassWithNamespace(className, text) {
-	var matches = text.match(new RegExp(`use.*${className};`));
+function formatNamespace(namespace) {
+	while (namespace.indexOf("\\\\") !== -1) {
+		namespace = namespace.replace("\\\\", "\\");
+	}
 
-	var match;
-	if (!matches)
+	return namespace;
+}
+
+function getClassWithNamespace(className, text) {
+	var match = null;
+	var matches;
+	if (className.indexOf('\\') !== -1) {
+		match = className;
+		if (match.indexOf("\\") === 0) {
+			match = match.replace("\\", '');
+		}
+		var namespace = match.substring(0, match.lastIndexOf("\\"));
+		if (namespace.indexOf('namespace') === 0) {
+			match = match.replace(namespace, namespace.replace('namespace', getNamespaceOfFile(text)));
+		} else {
+			var regExp = `(?<=use)[^;]+${namespace}\\s*(?=;)`;
+			matches = text.match(new RegExp(regExp, "gs")); 
+			if (matches) {
+				match = match.replace(namespace, matches[0].trim());
+			}
+		}
+	} else {
+		var regExp = `(?<=use)[^;]+[\\s]+(?=as[\\s]+${className};)`;
+		matches = text.match(new RegExp(regExp, "gs"));
+		if (!matches) {
+			matches = text.match(new RegExp(`(?<=use)[\\s]+[^;]+${className}(?=;)`, "gs"));
+		}
+
+		if (matches) {
+			match = matches[0];
+		}
+	}
+
+	if (!match)
 		match = getNamespaceOfFile(text) + "\\" + className;
 	else 
-		match = matches[0].replace('use', '').replace(';', '').trim();
+		match = match.trim();
+
+	match = formatNamespace(match);
 
 	return match;
 }
