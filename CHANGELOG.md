@@ -8,3 +8,6 @@
 
 ## [1.0.2] - 2021-08-14
 - Manifest changes
+
+## [1.0.3] - 2021-08-14
+- Added demo gif to readme.md
