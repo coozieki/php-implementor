@@ -55,16 +55,23 @@ function activate(context) {
 async function insertSnippet(pos) {
 	var text = "";
 	var parents = getAllParents(doc.getText()).then(parents => {
-		var methodsCount = 0;
+		var methods = [];
 		parents.forEach(parent => {
 			parent.methods.forEach(method => {
-				text += "\n\t" + method.declaration + "\n\t{\n\t\tthrow new \\Exception(\"Method not implemented\");\n\t}\n\t";
-				methodsCount++;
+				methods.push(method.declaration);
 			});
 		});
-		editor.insertSnippet(new vscode.SnippetString(text.replaceAll('$', '\\$')), pos);
-
-		vscode.window.showInformationMessage('Implemented ' + methodsCount + ' methods!');
+		vscode.window.showQuickPick(methods, {
+			canPickMany: true,
+			title: "Choose methods to implement",
+			placeHolder: "Choose methods"
+		}).then(pickedMethods => {
+			pickedMethods.forEach(method => {
+				text += "\n\t" + method + "\n\t{\n\t\tthrow new \\Exception(\"Method not implemented\");\n\t}\n\t";
+			});
+			editor.insertSnippet(new vscode.SnippetString(text.replaceAll('$', '\\$')), pos);
+			vscode.window.showInformationMessage('Implemented ' + pickedMethods.length + ' methods!');
+		});
 	});
 
 	return;
