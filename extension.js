@@ -5,39 +5,44 @@ const vscode = require('vscode');
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 
-var editor = vscode.window.activeTextEditor;
-var doc = editor.document;
+var editor;
+var doc;
 var paths = {};
 
 /**
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
+	function setEditor() {
+		if (vscode.window.activeTextEditor !== undefined) {
+			editor = vscode.window.activeTextEditor;
+			doc = editor.document;
+		}
+	}
+
 	function setConfiguration() {
-		paths = vscode.workspace.getConfiguration().get('php-implementor.autoloads');
+		var configuration = vscode.workspace.getConfiguration();
+		paths = configuration.get('php-implementor.autoloads');
+		vscode.commands.executeCommand("setContext", 'php-implementor.showInContextMenu', configuration.get('php-implementor.showInContextMenu'));
 	}
 
 	vscode.window.onDidChangeActiveTextEditor(() => {
-		if (vscode.window.activeTextEditor !== undefined) {
-			editor = vscode.window.activeTextEditor;
-			doc = editor.document;
-		}
+		setEditor();
 	});
 
 	vscode.window.onDidChangeVisibleTextEditors(() => {
-		if (vscode.window.activeTextEditor !== undefined) {
-			editor = vscode.window.activeTextEditor;
-			doc = editor.document;
-		}
+		setEditor();
 	});
 
 	vscode.workspace.onDidChangeConfiguration(() => {
 		setConfiguration();
 	});
 
+	setEditor();
+
 	setConfiguration();
 
-	let disposable = vscode.commands.registerCommand('php-implement.implement', async function () {
+	let disposable = vscode.commands.registerCommand('php-implementor.implement', async function () {
 		var offset = doc.getText().indexOf("{");
 		var pos = doc.positionAt(offset + 1);
 
@@ -131,8 +136,6 @@ async function getAllParents(text, result = []) {
 	
 	var implementedMethods = getImplementedMethods(text);
 
-	console.log(implementedMethods);
-
 	result.forEach((parent, resultIndex) => {
 		result[resultIndex].methods = parent.methods.filter((method) => {
 			return implementedMethods.find(val => method.methodName == val.methodName) === undefined;
@@ -188,7 +191,13 @@ async function getFileText(namespace) {
 	try {
 		text = await vscode.workspace.fs.readFile(file).then((data) => data.toString());
 	} catch(e) {
-		vscode.window.showErrorMessage(`File at path \"${filepath}\" not found! Try changing extension configuration.`);
+		var action = "Go to settings";
+		vscode.window.showErrorMessage(`File at path \"${filepath}\" not found! Try changing extension configuration in "Extensions"->"PHP Implementor".`, action)
+					  .then(val => {
+						if (val = action) {
+							vscode.commands.executeCommand("workbench.action.openSettings2");
+						}
+					  });
 	}
 
 	return text;

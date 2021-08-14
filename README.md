@@ -5,7 +5,7 @@ Implement php interface/abstract class methods faster!
 
 ![til](./images/demo.gif)
 
-For the extension to work, your project must follow the PSR-0 autoloading standarts, which means, that if you have a class with a namespace like this:
+For the extension to work, your project must follow the PSR-4 autoloading standarts, which means, that if you have a class with a namespace like this:
 
 ```php
    <?php 

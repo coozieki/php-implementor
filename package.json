@@ -17,7 +17,8 @@
 		"Snippets"
 	],
 	"activationEvents": [
-		"onCommand:php-implement.implement"
+		"onCommand:php-implementor.implement",
+		"onStartupFinished"
 	],
 	"main": "./extension.js",
 	"contributes": {
@@ -30,6 +31,12 @@
 						"default": {},
 						"description": "Configure paths of root namespaces",
 						"scope": "resource"
+					},
+					"php-implementor.showInContextMenu": {
+						"type": "boolean",
+						"default": true,
+						"description": "Show implementation command in editor context menu",
+						"scope": "resource"
 					}
 				}
 			}
@@ -37,15 +44,16 @@
 		"menus": {
 			"editor/context": [
 				{
-					"when": "editorLangId == php",
-					"command": "php-implement.implement"
+					"when": "editorLangId == php && php-implementor.showInContextMenu",
+					"command": "php-implementor.implement",
+					"group": "1_modification@1"
 				}
 			]
 		},
 		"commands": [
 			{
-				"command": "php-implement.implement",
-				"title": "Implement abstract methods"
+				"command": "php-implementor.implement",
+				"title": "Implement Abstract Methods"
 			}
 		]
 	},
