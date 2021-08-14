@@ -2,7 +2,7 @@
 	"name": "php-implementor",
 	"displayName": "PHP Implementor",
 	"description": "Implement your php interfaces/abstract classes faster",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"publisher": "coozieki",
 	"icon": "images/php_icon.png",
 	"repository": {
@@ -13,7 +13,8 @@
 		"vscode": "^1.59.0"
 	},
 	"categories": [
-		"Programming Languages", "Snippets"
+		"Programming Languages",
+		"Snippets"
 	],
 	"activationEvents": [
 		"onCommand:php-implement.implement"
