@@ -13,7 +13,7 @@
 		"vscode": "^1.59.0"
 	},
 	"categories": [
-		"Other"
+		"Programming Languages", "Snippets"
 	],
 	"activationEvents": [
 		"onCommand:php-implement.implement"

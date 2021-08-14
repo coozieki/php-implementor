@@ -1,9 +1,10 @@
 # Change Log
 
-All notable changes to the "php-implement" extension will be documented in this file.
+## [1.0.0] - 2021-08-14
+- Initial commit
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+## [1.0.1] - 2021-08-14
+- Minor readme.md changes
 
-## [Unreleased]
-
-- Initial release
+## [1.0.2] - 2021-08-14
+- Manifest changes
