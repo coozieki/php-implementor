@@ -71,7 +71,7 @@ async function insertSnippet(pos) {
 			pickedMethods.forEach(method => {
 				text += "\n\t" + method + "\n\t{\n\t\tthrow new \\Exception(\"Method not implemented\");\n\t}\n\t";
 			});
-			editor.insertSnippet(new vscode.SnippetString(text.replaceAll('$', '\\$')), pos);
+			editor.insertSnippet(new vscode.SnippetString(text.replace(/$/g, '\\$')), pos);
 			vscode.window.showInformationMessage('Implemented ' + pickedMethods.length + ' methods!');
 		});
 	});
@@ -145,7 +145,7 @@ async function getAllParents(text, result = []) {
 	if (eI !== -1) {
 		var classes = text.substring(eI+7, impI !== -1 ? impI : text.indexOf("{", eI)).trim();
 		while(classes.indexOf(' ') !== -1) {
-			classes = classes.replaceAll(' ', '');
+			classes = classes.replace(/ /g, '');
 		}
 	
 		classes = classes.split(',');
@@ -157,7 +157,7 @@ async function getAllParents(text, result = []) {
 	if (impI !== -1) {
 		var interfaces = text.substring(impI+10, text.indexOf("{", impI)).trim();
 		while(interfaces.indexOf(' ') !== -1) {
-			interfaces = interfaces.replaceAll(' ', '');
+			interfaces = interfaces.replace(/ /g, '');
 		}
 
 		interfaces = interfaces.split(',');
@@ -228,7 +228,7 @@ async function getFileText(namespace) {
 		namespace = namespace.replace(prop, paths[prop]);
 	}
 
-	namespace = namespace.replaceAll("\\", "/").replaceAll('//', '/');
+	namespace = namespace.replace(/\\/g, "/").replace(/\/\//g, '/');
 	var filepath = workspaceFolder + "/" + namespace + '.php';
 
 	var file = vscode.Uri.file(filepath);
