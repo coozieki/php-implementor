@@ -1,5 +1,9 @@
 # Change Log
 
+## [1.3.1]
+### Fixed
+- Compatibility with older VSCode versions
+
 ## [1.3.0]
 ### Added
 - Support for all type of **use..** declarations
