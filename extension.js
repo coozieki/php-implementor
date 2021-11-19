@@ -71,7 +71,7 @@ async function insertSnippet(pos) {
 			pickedMethods.forEach(method => {
 				text += "\n\t" + method + "\n\t{\n\t\tthrow new \\Exception(\"Method not implemented\");\n\t}\n\t";
 			});
-			editor.insertSnippet(new vscode.SnippetString(text.replace(/$/g, '\\$')), pos);
+			editor.insertSnippet(new vscode.SnippetString(text.replace(/\$/g, '\\$')), pos);
 			vscode.window.showInformationMessage('Implemented ' + pickedMethods.length + ' methods!');
 		});
 	});
