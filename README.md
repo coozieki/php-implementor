@@ -1,8 +1,6 @@
 # PHP Implementor
 Implement php interface/abstract class methods faster!
 
-**Currently work in progress.**
-
 ![til](./images/demo.gif)
 
 For the extension to work, your project must follow the PSR-4 autoloading standarts, which means, that if you have a class with a namespace like this:
