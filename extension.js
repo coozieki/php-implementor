@@ -54,7 +54,7 @@ function activate(context) {
 
 async function insertSnippet(pos) {
 	var text = "";
-	var parents = getAllParents(doc.getText()).then(parents => {
+	var parents = getAllParents(removeCommentsFromText(doc.getText())).then(parents => {
 		var methods = [];
 		parents.forEach(parent => {
 			parent.methods.forEach(method => {
@@ -222,7 +222,7 @@ function getAbstractMethods(text) {
 
 async function getFileText(namespace) {
 	var text;
-    var workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri).uri.fsPath;
+  var workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri).uri.fsPath;
 
 	for(var prop in paths) {
 		namespace = namespace.replace(prop, paths[prop]);
@@ -245,7 +245,11 @@ async function getFileText(namespace) {
 					  });
 	}
 
-	return text;
+	return removeCommentsFromText(text);
+}
+
+function removeCommentsFromText(text) {
+  return text.replace(/\/\/.*$/gm, '').replace(/\/\*(.*?)\*\//gs, '').replace(/\#.*$/gm, '');
 }
 
 // this method is called when your extension is deactivated
