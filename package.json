@@ -26,6 +26,18 @@
 			{
 				"title": "PHP Implementor",
 				"properties": {
+          "php-implementor.useComposerAutoloads": {
+            "type": "boolean",
+            "default": false,
+            "description": "If set to true, imports the autoloads paths in composer.json file. Otherwise uses php-implementor.autoloads setting.",
+            "scope": "resource"
+          },
+          "php-implementor.composerPath": {
+            "type": "string",
+            "default": "",
+            "description": "Path to your composer.json file in your workspace. Used when php-implementor.useComposerAutoloads set to true.",
+            "scope": "resource"
+          },
 					"php-implementor.autoloads": {
 						"type": "object",
 						"default": {},
@@ -54,7 +66,11 @@
 			{
 				"command": "php-implementor.implement",
 				"title": "Implement Abstract Methods"
-			}
+			},
+      {
+        "command": "php-implementor.refreshComposerAutoloads",
+        "title": "PHP Implementor: Refresh composer autoloads"
+      }
 		]
 	},
 	"scripts": {
