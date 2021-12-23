@@ -26,29 +26,33 @@
 			{
 				"title": "PHP Implementor",
 				"properties": {
+					"php-implementor.showInContextMenu": {
+						"type": "boolean",
+						"default": true,
+						"description": "Show implementation command in editor context menu",
+						"scope": "resource",
+            "order": 0
+					},
           "php-implementor.useComposerAutoloads": {
             "type": "boolean",
-            "default": false,
-            "description": "If set to true, imports the autoloads paths in composer.json file. Otherwise uses php-implementor.autoloads setting.",
-            "scope": "resource"
+            "default": true,
+            "markdownDescription": "If set to true, imports the autoload root paths from `composer.json` file. Otherwise uses `php-implementor.autoloads` setting.",
+            "scope": "resource",
+            "order": 1
           },
           "php-implementor.composerPath": {
             "type": "string",
             "default": "",
-            "description": "Path to your composer.json file in your workspace. Used when php-implementor.useComposerAutoloads set to true.",
-            "scope": "resource"
+            "markdownDescription": "Used when `php-implementor.useComposerAutoloads` set to true. If you are working with several projects in one workspace and your `composer.json` is not in the root folder of your workspace, you can specify path to `composer.json` for the project you are currently working with.",
+            "scope": "resource",
+            "order": 2
           },
 					"php-implementor.autoloads": {
 						"type": "object",
 						"default": {},
 						"description": "Configure paths of root namespaces",
-						"scope": "resource"
-					},
-					"php-implementor.showInContextMenu": {
-						"type": "boolean",
-						"default": true,
-						"description": "Show implementation command in editor context menu",
-						"scope": "resource"
+						"scope": "resource",
+            "order": 3
 					}
 				}
 			}

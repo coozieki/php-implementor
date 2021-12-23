@@ -46,6 +46,10 @@ function activate(context) {
     composerPaths = {};
     if (composerConfigs && composerConfigs.autoload) {
       composerPaths = composerConfigs.autoload['psr-4'] || {};
+      for(let namespace in composerPaths) {
+        composerPaths[namespace] = newComposerJsonPath+'/'+composerPaths[namespace];
+        composerPaths[namespace] = composerPaths[namespace].replace(/\/\//g, '/');
+      }
     }
   }
 
