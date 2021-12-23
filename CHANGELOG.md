@@ -1,5 +1,12 @@
 # Change Log
 
+## [1.4.0] - [1.4.1]
+### Added
+- An option to import `composer.json` autoload paths instead of manually writing it in `php-implementor.autoloads`
+### Fixed
+- Bugs with comments preventing correct parsing of php files
+- Other minor bug fixes
+
 ## [1.3.4]
 ### Changed
 - Minor readme changes
