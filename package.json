@@ -2,7 +2,7 @@
 	"name": "php-implementor",
 	"displayName": "PHP Implementor",
 	"description": "Implement your php interfaces/abstract classes faster",
-	"version": "1.3.4",
+	"version": "1.4.0",
 	"publisher": "coozieki",
 	"icon": "images/php_icon.png",
 	"repository": {
@@ -31,28 +31,28 @@
 						"default": true,
 						"description": "Show implementation command in editor context menu",
 						"scope": "resource",
-            "order": 0
+						"order": 0
 					},
-          "php-implementor.useComposerAutoloads": {
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "If set to true, imports the autoload root paths from `composer.json` file. Otherwise uses `php-implementor.autoloads` setting.",
-            "scope": "resource",
-            "order": 1
-          },
-          "php-implementor.composerPath": {
-            "type": "string",
-            "default": "",
-            "markdownDescription": "Used when `php-implementor.useComposerAutoloads` set to true. If you are working with several projects in one workspace and your `composer.json` is not in the root folder of your workspace, you can specify path to `composer.json` for the project you are currently working with.",
-            "scope": "resource",
-            "order": 2
-          },
+					"php-implementor.useComposerAutoloads": {
+						"type": "boolean",
+						"default": true,
+						"markdownDescription": "If set to true, imports the autoload root paths from `composer.json` file. Otherwise uses `php-implementor.autoloads` setting.",
+						"scope": "resource",
+						"order": 1
+					},
+					"php-implementor.composerPath": {
+						"type": "string",
+						"default": "",
+						"markdownDescription": "Used when `php-implementor.useComposerAutoloads` set to true. If you are working with several projects in one workspace and your `composer.json` is not in the root folder of your workspace, you can specify path to `composer.json` for the project you are currently working with.",
+						"scope": "resource",
+						"order": 2
+					},
 					"php-implementor.autoloads": {
 						"type": "object",
 						"default": {},
 						"description": "Configure paths of root namespaces",
 						"scope": "resource",
-            "order": 3
+						"order": 3
 					}
 				}
 			}
@@ -71,10 +71,10 @@
 				"command": "php-implementor.implement",
 				"title": "Implement Abstract Methods"
 			},
-      {
-        "command": "php-implementor.refreshComposerAutoloads",
-        "title": "PHP Implementor: Refresh composer autoloads"
-      }
+			{
+				"command": "php-implementor.refreshComposerAutoloads",
+				"title": "PHP Implementor: Refresh composer autoloads"
+			}
 		]
 	},
 	"scripts": {
