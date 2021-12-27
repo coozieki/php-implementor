@@ -138,8 +138,9 @@ function activate(context) {
 	setConfiguration();
 
 	let implementCommand = vscode.commands.registerCommand('php-implementor.implement', async function () {
-		var offset = doc.getText().indexOf("{");
-		var pos = doc.positionAt(offset + 1);
+		//var offset = doc.getText().indexOf("{");
+    var offset = doc.offsetAt(editor.selection.active.with(editor.selection.active.line, 0));
+		var pos = doc.positionAt(offset);
 
 		insertSnippet(pos);
 	});

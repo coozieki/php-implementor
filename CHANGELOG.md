@@ -1,12 +1,16 @@
 # Change Log
 
+## [1.6.0]
+### Added
+- Insert snippets at current cursor position
+
 ## [1.5.1]
 ### Fixed
 - Minor fixes
 
 ## [1.5.0]
 ### Added
-- Parsing autoload from composer.json dependcies, so now you can easily implement interface methods from other packages
+- Parsing autoload from composer.json dependencies, so now you can easily implement interface methods from other packages
 
 ## [1.4.0] - [1.4.1]
 ### Added
