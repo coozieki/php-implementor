@@ -138,9 +138,8 @@ function activate(context) {
 	setConfiguration();
 
 	let implementCommand = vscode.commands.registerCommand('php-implementor.implement', async function () {
-		//var offset = doc.getText().indexOf("{");
-    var offset = doc.offsetAt(editor.selection.active.with(editor.selection.active.line, 0));
-		var pos = doc.positionAt(offset);
+    var offset = doc.offsetAt(editor.selection.active);
+		var pos = doc.positionAt(offset + 1);
 
 		insertSnippet(pos);
 	});
@@ -171,6 +170,10 @@ async function insertSnippet(pos) {
 		}).then(pickedMethods => {
 			if (pickedMethods === undefined)
 				return; 
+      editor.insertSnippet(new vscode.SnippetString("\n"), pos);
+      var offset = doc.offsetAt(editor.selection.active.with(editor.selection.active.line + 1, 0));
+      pos = doc.positionAt(offset);
+
 			pickedMethods.forEach(method => {
 				text += "\n\t" + method + "\n\t{\n\t\tthrow new \\Exception(\"Method not implemented\");\n\t}\n\t";
 			});
@@ -371,7 +374,7 @@ async function getFileText(namespace) {
 	} catch(e) {
     let message;
     if (useComposer) {
-      message = 'Make sure you specified correct "php-implementor.composerPath" option in your ".vscode/settings.json".';
+      message = 'Try to use "php-implementor.refreshComposerAutoloads" command or make sure you specified correct "php-implementor.composerPath" option in your ".vscode/settings.json".';
     } else {
       message = 'Make sure you specified correct root folders in "php-implementor.autoloads" option in your ".vscode/settings.json".';
     }
