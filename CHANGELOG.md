@@ -1,5 +1,9 @@
 # Change Log
 
+## [1.5.1]
+### Fixed
+- Minor fixes
+
 ## [1.5.0]
 ### Added
 - Parsing autoload from composer.json dependcies, so now you can easily implement interface methods from other packages
