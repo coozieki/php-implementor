@@ -3,6 +3,8 @@
 ## [1.6.0]
 ### Added
 - Insert snippets at current cursor position
+### Changed
+- Changed error messages
 
 ## [1.5.1]
 ### Fixed
