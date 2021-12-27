@@ -1,5 +1,9 @@
 # Change Log
 
+## [1.5.0]
+### Added
+- Parsing autoload from composer.json dependcies, so now you can easily implement interface methods from other packages
+
 ## [1.4.0] - [1.4.1]
 ### Added
 - An option to import `composer.json` autoload paths instead of manually writing it in `php-implementor.autoloads`

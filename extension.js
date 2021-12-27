@@ -24,6 +24,8 @@ function activate(context) {
 	}
 
   async function refreshComposerPaths(newComposerJsonPath) {
+    if (!doc) return;
+
     let workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri);
     if (!workspaceFolder) return;
     workspaceFolder = workspaceFolder.uri.fsPath;
@@ -31,7 +33,7 @@ function activate(context) {
     let filepath = workspaceFolder+'/'+newComposerJsonPath+'/'+'composer.json';
     filepath = filepath.replace(/\/\//g, '/');
 
-    const file = vscode.Uri.file(filepath);
+    let file = vscode.Uri.file(filepath);
 
     let text;
     try {
@@ -44,12 +46,63 @@ function activate(context) {
     const composerConfigs = JSON.parse(text);
 
     composerPaths = {};
-    if (composerConfigs && composerConfigs.autoload) {
-      composerPaths = composerConfigs.autoload['psr-4'] || {};
-      for(let namespace in composerPaths) {
-        composerPaths[namespace] = newComposerJsonPath+'/'+composerPaths[namespace];
-        composerPaths[namespace] = composerPaths[namespace].replace(/\/\//g, '/');
+    if (composerConfigs) {
+      if (composerConfigs.autoload) {
+        composerPaths = composerConfigs.autoload['psr-4'] || {};
+        for (let namespace in composerPaths) {
+          composerPaths[namespace] = newComposerJsonPath+'/'+composerPaths[namespace];
+          composerPaths[namespace] = composerPaths[namespace].replace(/\/\//g, '/');
+        }
       }
+
+      const setPackagesComposerPaths = async (composerPackages) => {
+        let vendorDir = 'vendor';
+        if (composerConfigs.config && composerConfigs.config['vendor-dir']) {
+          vendorDir = composerConfigs.config['vendor-dir'];
+        }
+        
+        let composerPackageConfigs;
+        for (let composerPackage in composerPackages) {
+          filepath = workspaceFolder+'/'+vendorDir+'/'+composerPackage+'/'+'composer.json';
+          filepath = filepath.replace(/\/\//g, '/');
+          file = vscode.Uri.file(filepath);
+          composerPackageConfigs = JSON.parse(await vscode.workspace.fs.readFile(file).then((data) => data.toString()));
+          
+          if (composerPackageConfigs && composerPackageConfigs.autoload) {
+            if (composerPackageConfigs.autoload['psr-4']) {
+              for (let composerPackageNamespace in composerPackageConfigs.autoload['psr-4']) {
+                composerPaths[composerPackageNamespace] = vendorDir+'/'+composerPackage+'/'+composerPackageConfigs.autoload['psr-4'][composerPackageNamespace];
+                composerPaths[composerPackageNamespace] = composerPaths[composerPackageNamespace].replace(/\/\//g, '/');
+              }
+            }
+
+            if (composerPackageConfigs.autoload['classmap']) {
+              composerPaths.classmap = typeof(composerPaths.classmap) === 'object' ? composerPaths.classmap : {};
+              composerPackageConfigs.autoload['classmap'] = composerPackageConfigs.autoload['classmap'].map(
+                el => (vendorDir+'/'+composerPackage+'/'+el).replace(/\/\//g, '/')
+              );
+              
+              filepath = (vendorDir+'/'+composerPackage).replace(/\/\//g, '/');
+
+              const packagePhpFile = (await vscode.workspace.findFiles(filepath+'/src/*.php'))[0];
+              file = vscode.Uri.file(packagePhpFile.path);
+              const packagePhpFileText = await vscode.workspace.fs.readFile(file).then((data) => data.toString());
+              const rootNamespace = getNamespaceOfFile(packagePhpFileText);
+
+              console.log(rootNamespace);
+
+              composerPaths.classmap[rootNamespace] = composerPackageConfigs.autoload['classmap'];
+            }
+          }
+        }
+      }
+      if (composerConfigs.require) {
+        await setPackagesComposerPaths(composerConfigs.require);
+      }
+      if (composerConfigs['require-dev']) {
+        await setPackagesComposerPaths(composerConfigs['require-dev']);
+      }
+      console.log(composerPaths);
     }
   }
 
@@ -276,15 +329,44 @@ async function getFileText(namespace) {
 	var text;
   var workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri).uri.fsPath;
 
-  const paths = getPaths();
+  var paths = getPaths();
+  var classmap = paths.classmap;
+
+  var pathFound = false;
 	for(var prop in paths) {
-		namespace = namespace.replace(prop, paths[prop]);
+    const reg = `^${prop}`.replace(/\\/g, '\\\\');
+    if (namespace.match(new RegExp(reg, 'gs'))) {
+      namespace = namespace.replace(prop, paths[prop]);
+      pathFound = true;
+      break;
+    }
 	}
 
-	namespace = namespace.replace(/\\/g, "/").replace(/\/\//g, '/');
-	var filepath = workspaceFolder + "/" + namespace + '.php';
-
-	var file = vscode.Uri.file(filepath);
+  var file, filepath;
+  if (pathFound) {
+    namespace = namespace.replace(/\\/g, "/").replace(/\/\//g, '/');
+    filepath = workspaceFolder + "/" + namespace + '.php';
+    filepath = filepath.replace(/\/\//g, '/');
+  
+    file = vscode.Uri.file(filepath);
+  } else {
+    for(var classmapRoot in classmap) {
+      const reg = `^${classmapRoot}`.replace(/\\/g, '\\\\');
+      const filename = namespace.substr(namespace.lastIndexOf('\\') + 1);
+      if (namespace.match(new RegExp(reg, 'gs'))) {
+        const foundFiles = await vscode.workspace.findFiles(`${classmap[classmapRoot]}**/${filename}.php`);
+        for(var foundFile of foundFiles) {
+          const fileText = await vscode.workspace.fs.readFile(foundFile).then((data) => data.toString());
+          const fileNamespace = getNamespaceOfFile(fileText);
+          if (fileNamespace == namespace.substr(0, namespace.lastIndexOf('\\'))) {
+            file = foundFile;
+            break;
+          }
+        }
+        break;
+      }
+    }
+  }
 
 	try {
 		text = await vscode.workspace.fs.readFile(file).then((data) => data.toString());
