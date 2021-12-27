@@ -89,8 +89,6 @@ function activate(context) {
               const packagePhpFileText = await vscode.workspace.fs.readFile(file).then((data) => data.toString());
               const rootNamespace = getNamespaceOfFile(packagePhpFileText);
 
-              console.log(rootNamespace);
-
               composerPaths.classmap[rootNamespace] = composerPackageConfigs.autoload['classmap'];
             }
           }
@@ -102,7 +100,6 @@ function activate(context) {
       if (composerConfigs['require-dev']) {
         await setPackagesComposerPaths(composerConfigs['require-dev']);
       }
-      console.log(composerPaths);
     }
   }
 
