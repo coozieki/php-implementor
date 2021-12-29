@@ -1,21 +1,44 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
-const vscode = require('vscode');
+import * as vscode from 'vscode';
+
+type StringToStringObj = {[key: string]: string};
+type StringToArrayOfStringsObj = {[key: string]: Array<string>};
+
+type MethodInfo = {
+  declaration: string;
+  methodName: string;
+};
+
+export class ComposerPaths {
+  classmap: StringToArrayOfStringsObj;
+  rootNamespaces: StringToStringObj;
+
+  constructor() {
+    this.classmap = {};
+    this.rootNamespaces = {};
+  }
+
+  clear() {
+    this.classmap = {};
+    this.rootNamespaces = {};
+  }
+}
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 
-var editor;
-var doc;
-var paths = {};
-var composerPaths = {};
-var useComposer;
-var composerJsonPath;
+let editor: vscode.TextEditor;
+let doc: vscode.TextDocument;
+let composerPaths = new ComposerPaths();
+let manualPaths: StringToStringObj = {};
+let useComposer: boolean | undefined;
+let composerJsonPath: string | undefined;
 
 /**
  * @param {vscode.ExtensionContext} context
  */
-function activate(context) {
+function activate(context: vscode.ExtensionContext) {
 	function setEditor() {
 		if (vscode.window.activeTextEditor !== undefined) {
 			editor = vscode.window.activeTextEditor;
@@ -23,10 +46,14 @@ function activate(context) {
 		}
 	}
 
-  async function refreshComposerPaths(newComposerJsonPath) {
-    if (!doc) return;
+  async function refreshComposerPaths(newComposerJsonPath: string | undefined) {
+    if (doc === undefined || editor === undefined) {
+      vscode.window.showErrorMessage('The editor window is not opened. Failed executing command.');
+      return;
+    }
 
-    let workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri);
+    let workspaceFolder: vscode.WorkspaceFolder | string | undefined = vscode.workspace.getWorkspaceFolder(doc.uri);
+    
     if (!workspaceFolder) return;
     workspaceFolder = workspaceFolder.uri.fsPath;
 
@@ -45,23 +72,25 @@ function activate(context) {
 
     const composerConfigs = JSON.parse(text);
 
-    composerPaths = {};
+    composerPaths.clear();
     if (composerConfigs) {
       if (composerConfigs.autoload) {
-        composerPaths = composerConfigs.autoload['psr-4'] || {};
-        for (let namespace in composerPaths) {
-          composerPaths[namespace] = newComposerJsonPath+'/'+composerPaths[namespace];
-          composerPaths[namespace] = composerPaths[namespace].replace(/\/\//g, '/');
+        let rootNamespaces = composerConfigs.autoload['psr-4'] || {};
+        for (let namespace in rootNamespaces) {
+          rootNamespaces[namespace] = newComposerJsonPath+'/'+rootNamespaces[namespace];
+          rootNamespaces[namespace] = rootNamespaces[namespace].replace(/\/\//g, '/');
         }
+        composerPaths.rootNamespaces = rootNamespaces;
       }
 
-      const setPackagesComposerPaths = async (composerPackages) => {
+      const setPackagesComposerPaths = async (composerPackages: StringToStringObj) => {
         let vendorDir = 'vendor';
         if (composerConfigs.config && composerConfigs.config['vendor-dir']) {
           vendorDir = composerConfigs.config['vendor-dir'];
         }
         
-        let composerPackageConfigs;
+        let composerPackageConfigs: {autoload: {'psr-4': StringToStringObj, classmap: Array<string>}};
+
         for (let composerPackage in composerPackages) {
           filepath = workspaceFolder+'/'+vendorDir+'/'+composerPackage+'/'+'composer.json';
           filepath = filepath.replace(/\/\//g, '/');
@@ -70,10 +99,12 @@ function activate(context) {
           
           if (composerPackageConfigs && composerPackageConfigs.autoload) {
             if (composerPackageConfigs.autoload['psr-4']) {
+              let rootNamespaces = composerPaths.rootNamespaces;
               for (let composerPackageNamespace in composerPackageConfigs.autoload['psr-4']) {
-                composerPaths[composerPackageNamespace] = vendorDir+'/'+composerPackage+'/'+composerPackageConfigs.autoload['psr-4'][composerPackageNamespace];
-                composerPaths[composerPackageNamespace] = composerPaths[composerPackageNamespace].replace(/\/\//g, '/');
+                rootNamespaces[composerPackageNamespace] = vendorDir+'/'+composerPackage+'/'+composerPackageConfigs.autoload['psr-4'][composerPackageNamespace];
+                rootNamespaces[composerPackageNamespace] = rootNamespaces[composerPackageNamespace].replace(/\/\//g, '/');
               }
+              composerPaths.rootNamespaces = rootNamespaces;
             }
 
             if (composerPackageConfigs.autoload['classmap']) {
@@ -104,12 +135,12 @@ function activate(context) {
   }
 
 	async function setConfiguration() {
-		var configuration = vscode.workspace.getConfiguration();
+		let configuration = vscode.workspace.getConfiguration();
 
-		paths = configuration.get('php-implementor.autoloads');
+		manualPaths = configuration.get('php-implementor.autoloads') || {};
 
-    const newUseComposer = configuration.get('php-implementor.useComposerAutoloads');
-    const newComposerJsonPath = configuration.get('php-implementor.composerPath');
+    const newUseComposer: boolean | undefined = configuration.get('php-implementor.useComposerAutoloads');
+    const newComposerJsonPath: string | undefined = configuration.get('php-implementor.composerPath');
 
     if (newUseComposer && (newUseComposer !== useComposer || newComposerJsonPath !== composerJsonPath)) {
       await refreshComposerPaths(newComposerJsonPath);
@@ -138,8 +169,13 @@ function activate(context) {
 	setConfiguration();
 
 	let implementCommand = vscode.commands.registerCommand('php-implementor.implement', async function () {
-    var offset = doc.offsetAt(editor.selection.active);
-		var pos = doc.positionAt(offset + 1);
+    if (doc === undefined || editor === undefined) {
+      vscode.window.showErrorMessage('The editor window is not opened. Failed executing command.');
+      return;
+    }
+
+    let offset = doc.offsetAt(editor.selection.active);
+		let pos = doc.positionAt(offset + 1);
 
 		insertSnippet(pos);
 	});
@@ -154,10 +190,11 @@ function activate(context) {
   context.subscriptions.push(refreshCommand);
 }
 
-async function insertSnippet(pos) {
-	var text = "";
-	var parents = getAllParents(removeCommentsFromText(doc.getText())).then(parents => {
-		var methods = [];
+async function insertSnippet(pos: vscode.Position) {
+	let text = "";
+
+	getAllParents(removeCommentsFromText(doc.getText())).then(parents => {
+		let methods: Array<string> = [];
 		parents.forEach(parent => {
 			parent.methods.forEach(method => {
 				methods.push(method.declaration);
@@ -170,8 +207,9 @@ async function insertSnippet(pos) {
 		}).then(pickedMethods => {
 			if (pickedMethods === undefined)
 				return; 
+      
       editor.insertSnippet(new vscode.SnippetString("\n"), pos);
-      var offset = doc.offsetAt(editor.selection.active.with(editor.selection.active.line + 1, 0));
+      let offset = doc.offsetAt(editor.selection.active.with(editor.selection.active.line + 1, 0));
       pos = doc.positionAt(offset);
 
 			pickedMethods.forEach(method => {
@@ -185,42 +223,42 @@ async function insertSnippet(pos) {
 	return;
 }
 
-async function getAllParents(text, result = []) {
-	var eI = text.indexOf('extends');
-	var impI = text.indexOf('implements');
+async function getAllParents(text: string, result: Array<{parent: string, methods: Array<MethodInfo>}> = []) {
+	let eI = text.indexOf('extends');
+	let impI = text.indexOf('implements');
 
 	if (eI === -1 && impI === -1)
 		return result;
 
-	var parents = [];
+	let parents: Array<string> = [];
 	if (eI !== -1) {
-		var classes = text.substring(eI+7, impI !== -1 ? impI : text.indexOf("{", eI)).trim();
+		let classes: string | Array<string> = text.substring(eI+7, impI !== -1 ? impI : text.indexOf("{", eI)).trim();
 		while(classes.indexOf(' ') !== -1) {
 			classes = classes.replace(/ /g, '');
 		}
 	
 		classes = classes.split(',');
 
-		classes.forEach($class => {
+		classes.forEach(($class: string) => {
 			parents.push(getClassWithNamespace($class, text));
 		});
 	}
 	if (impI !== -1) {
-		var interfaces = text.substring(impI+10, text.indexOf("{", impI)).trim();
+		let interfaces: string | Array<string> = text.substring(impI+10, text.indexOf("{", impI)).trim();
 		while(interfaces.indexOf(' ') !== -1) {
 			interfaces = interfaces.replace(/ /g, '');
 		}
 
 		interfaces = interfaces.split(',');
 
-		interfaces.forEach($interface => {
+		interfaces.forEach(($interface: string) => {
 			parents.push(getClassWithNamespace($interface, text));
 		});
 	}
 
 		
 	for (const parent of parents) {
-		var parentText = await getFileText(parent);
+		let parentText = await getFileText(parent);
 
 		await getAllParents(parentText, result);
 	
@@ -230,7 +268,7 @@ async function getAllParents(text, result = []) {
 		});
 	}
 	
-	var implementedMethods = getImplementedMethods(text);
+	let implementedMethods = getImplementedMethods(text);
 
 	result.forEach((parent, resultIndex) => {
 		result[resultIndex].methods = parent.methods.filter((method) => {
@@ -243,26 +281,26 @@ async function getAllParents(text, result = []) {
 	return result;
 }
 
-function getClassWithNamespace(className, text) {
-	var match = null;
-	var matches;
+function getClassWithNamespace(className: string, text: string) {
+	let match = null;
+	let matches;
 	if (className.indexOf('\\') !== -1) {
 		match = className;
 		if (match.indexOf("\\") === 0) {
 			match = match.replace("\\", '');
 		}
-		var namespace = match.substring(0, match.lastIndexOf("\\"));
+		let namespace = match.substring(0, match.lastIndexOf("\\"));
 		if (namespace.indexOf('namespace') === 0) {
 			match = match.replace(namespace, namespace.replace('namespace', getNamespaceOfFile(text)));
 		} else {
-			var regExp = `(?<=use)[^;]+${namespace}\\s*(?=;)`;
+			let regExp = `(?<=use)[^;]+${namespace}\\s*(?=;)`;
 			matches = text.match(new RegExp(regExp, "gs")); 
 			if (matches) {
 				match = match.replace(namespace, matches[0].trim());
 			}
 		}
 	} else {
-		var regExp = `(?<=use)[^;]+[\\s]+(?=as[\\s]+${className};)`;
+		let regExp = `(?<=use)[^;]+[\\s]+(?=as[\\s]+${className};)`;
 		matches = text.match(new RegExp(regExp, "gs"));
 		if (!matches) {
 			matches = text.match(new RegExp(`(?<=use)[\\s]+[^;]+${className}(?=;)`, "gs"));
@@ -283,14 +321,14 @@ function getClassWithNamespace(className, text) {
 	return match;
 }
 
-function getNamespaceOfFile(text) {
-	var nI = text.indexOf('namespace');
-	var namespace = text.substring(nI+9, text.indexOf(";", nI)).trim();
+function getNamespaceOfFile(text: string) {
+	let nI = text.indexOf('namespace');
+	let namespace = text.substring(nI+9, text.indexOf(";", nI)).trim();
 
 	return namespace;
 }
 
-function formatNamespace(namespace) {
+function formatNamespace(namespace: string) {
 	while (namespace.indexOf("\\\\") !== -1) {
 		namespace = namespace.replace("\\\\", "\\");
 	}
@@ -298,11 +336,13 @@ function formatNamespace(namespace) {
 	return namespace;
 }
 
-function getImplementedMethods(text) {
-	var methods = [];
-	var matches = text.matchAll(/(?<=\s)(((public)|(static)|(protected)|(private)|(final))\s+)*function[^\n;]*\([^\)]*\)[^{\(\)]*(?={)/gs);
+function getImplementedMethods(text: string) {
+	let methods: Array<MethodInfo> = [];
+  //@ts-ignore
+	let matches = text.matchAll(/(?<=\s)(((public)|(static)|(protected)|(private)|(final))\s+)*function[^\n;]*\([^\)]*\)[^{\(\)]*(?={)/gs);
 	Array.from(matches).forEach((val) => {
-		var func = val[0];
+    //@ts-ignore
+		let func = val[0];
 		methods.push({
 			declaration: func.replace('{', '').trim(),
 			methodName: func.substring(func.indexOf('function') + 8, func.indexOf('(')).trim()
@@ -312,11 +352,13 @@ function getImplementedMethods(text) {
 	return methods;
 }
 
-function getAbstractMethods(text) {	
-	var methods = []; 
-	var matches = text.matchAll(/(?<=\s)(((public)|(static)|(protected)|(private)|(abstract))\s+)*function[^\n;]*\([^\)]*\)[\s\:\w]*(?=;)/gs);
+function getAbstractMethods(text: string): Array<MethodInfo> {	
+	let methods: Array<MethodInfo> = []; 
+  //@ts-ignore
+	let matches = text.matchAll(/(?<=\s)(((public)|(static)|(protected)|(private)|(abstract))\s+)*function[^\n;]*\([^\)]*\)[\s\:\w]*(?=;)/gs);
 	Array.from(matches).forEach((val) => {
-		var func = val[0];
+    //@ts-ignore
+		let func = val[0];
 		methods.push({
 			declaration: func.replace('abstract', '').trim().replace('  ', ' '),
 			methodName: func.substring(func.indexOf('function') + 8, func.indexOf('(')).trim()
@@ -326,24 +368,26 @@ function getAbstractMethods(text) {
 	return methods;
 }
 
-async function getFileText(namespace) {
-	var text;
-  var workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri).uri.fsPath;
+async function getFileText(namespace: string) {
+	let text;
+  //@ts-ignore
+  let workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri).uri.fsPath;
 
-  var paths = getPaths();
-  var classmap = paths.classmap;
+  let paths = getPaths();
+  let classmap = paths instanceof ComposerPaths ? paths.classmap : {};
 
-  var pathFound = false;
-	for(var prop in paths) {
+  let pathFound = false;
+  const rootNamespaces = paths instanceof ComposerPaths ? paths.rootNamespaces : paths;
+	for(let prop in rootNamespaces) {
     const reg = `^${prop}`.replace(/\\/g, '\\\\');
     if (namespace.match(new RegExp(reg, 'gs'))) {
-      namespace = namespace.replace(prop, paths[prop]);
+      namespace = namespace.replace(prop, rootNamespaces[prop]);
       pathFound = true;
       break;
     }
 	}
 
-  var file, filepath;
+  let file: vscode.Uri | undefined, filepath;
   if (pathFound) {
     namespace = namespace.replace(/\\/g, "/").replace(/\/\//g, '/');
     filepath = workspaceFolder + "/" + namespace + '.php';
@@ -351,12 +395,12 @@ async function getFileText(namespace) {
   
     file = vscode.Uri.file(filepath);
   } else {
-    for(var classmapRoot in classmap) {
+    for(let classmapRoot in classmap) {
       const reg = `^${classmapRoot}`.replace(/\\/g, '\\\\');
       const filename = namespace.substr(namespace.lastIndexOf('\\') + 1);
       if (namespace.match(new RegExp(reg, 'gs'))) {
         const foundFiles = await vscode.workspace.findFiles(`${classmap[classmapRoot]}**/${filename}.php`);
-        for(var foundFile of foundFiles) {
+        for(let foundFile of foundFiles) {
           const fileText = await vscode.workspace.fs.readFile(foundFile).then((data) => data.toString());
           const fileNamespace = getNamespaceOfFile(fileText);
           if (fileNamespace == namespace.substr(0, namespace.lastIndexOf('\\'))) {
@@ -370,6 +414,9 @@ async function getFileText(namespace) {
   }
 
 	try {
+    if (file === undefined) {
+      throw new Error();
+    }
 		text = await vscode.workspace.fs.readFile(file).then((data) => data.toString());
 	} catch(e) {
     let message;
@@ -378,24 +425,20 @@ async function getFileText(namespace) {
     } else {
       message = 'Make sure you specified correct root folders in "php-implementor.autoloads" option in your ".vscode/settings.json".';
     }
-		vscode.window.showErrorMessage(`File at path \"${filepath}\" not found! ${message}`)
-					  .then(val => {
-						if (val === action) {
-							vscode.commands.executeCommand("workbench.action.openSettings2");
-						}
-					  });
+
+		vscode.window.showErrorMessage(`File at path \"${filepath}\" not found! ${message}`);
     throw e;
 	}
 
 	return removeCommentsFromText(text);
 }
 
-function removeCommentsFromText(text) {
+function removeCommentsFromText(text: string) {
   return text.replace(/\/\/.*$/gm, '').replace(/\/\*(.*?)\*\//gs, '').replace(/\#.*$/gm, '');
 }
 
 function getPaths() {
-  return useComposer ? composerPaths : paths;
+  return useComposer ? composerPaths : manualPaths;
 }
 
 // this method is called when your extension is deactivated
@@ -403,5 +446,6 @@ function deactivate() {}
 
 module.exports = {
 	activate,
-	deactivate
+	deactivate,
+  ComposerPaths
 }
