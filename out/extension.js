@@ -1,9 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ComposerPaths = void 0;
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
+exports.PHPFile = exports.PHPFileText = exports.ComposerPaths = exports.EnvironmentInfo = void 0;
 const vscode = require("vscode");
+class EnvironmentInfo {
+    static isDefined() {
+        return EnvironmentInfo.doc !== undefined && EnvironmentInfo.editor !== undefined && EnvironmentInfo.workspaceFolder !== undefined;
+    }
+}
+exports.EnvironmentInfo = EnvironmentInfo;
 class ComposerPaths {
     constructor() {
         this.classmap = {};
@@ -15,10 +19,158 @@ class ComposerPaths {
     }
 }
 exports.ComposerPaths = ComposerPaths;
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
-let editor;
-let doc;
+class PHPFileText {
+    constructor(text) {
+        this.text = text;
+    }
+    getNamespace() {
+        let nI = this.text.indexOf('namespace');
+        let namespace = this.text.substring(nI + 9, this.text.indexOf(";", nI)).trim();
+        return namespace;
+    }
+    getText() {
+        return this.text;
+    }
+    getClassWithNamespace(className) {
+        let match = null;
+        let matches;
+        if (className.indexOf('\\') !== -1) {
+            match = className;
+            if (match.indexOf("\\") === 0) {
+                match = match.replace("\\", '');
+            }
+            let namespace = match.substring(0, match.lastIndexOf("\\"));
+            if (namespace.indexOf('namespace') === 0) {
+                match = match.replace(namespace, namespace.replace('namespace', this.text));
+            }
+            else {
+                let regExp = `(?<=use)[^;]+${namespace}\\s*(?=;)`;
+                matches = this.text.match(new RegExp(regExp, "gs"));
+                if (matches) {
+                    match = match.replace(namespace, matches[0].trim());
+                }
+            }
+        }
+        else {
+            let regExp = `(?<=use)[^;]+[\\s]+(?=as[\\s]+${className};)`;
+            matches = this.text.match(new RegExp(regExp, "gs"));
+            if (!matches) {
+                matches = this.text.match(new RegExp(`(?<=use)[\\s]+[^;]+${className}(?=;)`, "gs"));
+            }
+            if (matches) {
+                match = matches[0];
+            }
+        }
+        if (!match)
+            match = this.getNamespace() + "\\" + className;
+        else
+            match = match.trim();
+        match = this.formatNamespace(match);
+        return match;
+    }
+    async getAllParents(result = []) {
+        let eI = this.text.indexOf('extends');
+        let impI = this.text.indexOf('implements');
+        if (eI === -1 && impI === -1)
+            return result;
+        let parents = [];
+        if (eI !== -1) {
+            let classes = this.text.substring(eI + 7, impI !== -1 ? impI : this.text.indexOf("{", eI)).trim();
+            while (classes.indexOf(' ') !== -1) {
+                classes = classes.replace(/ /g, '');
+            }
+            classes = classes.split(',');
+            classes.forEach(($class) => {
+                parents.push(this.getClassWithNamespace($class));
+            });
+        }
+        if (impI !== -1) {
+            let interfaces = this.text.substring(impI + 10, this.text.indexOf("{", impI)).trim();
+            while (interfaces.indexOf(' ') !== -1) {
+                interfaces = interfaces.replace(/ /g, '');
+            }
+            interfaces = interfaces.split(',');
+            interfaces.forEach(($interface) => {
+                parents.push(this.getClassWithNamespace($interface));
+            });
+        }
+        for (const parent of parents) {
+            let parentText = await getFileText(parent);
+            await this.getAllParents(result);
+            result.push({
+                parent: parent,
+                methods: parentText.getAbstractMethods()
+            });
+        }
+        let implementedMethods = this.getImplementedMethods();
+        result.forEach((parent, resultIndex) => {
+            result[resultIndex].methods = parent.methods.filter((method) => {
+                return implementedMethods.find(val => method.methodName == val.methodName) === undefined;
+            });
+        });
+        result = result.filter(parent => parent.methods.length > 0);
+        return result;
+    }
+    removeCommentsFromText() {
+        this.text = this.text.replace(/\/\/.*$/gm, '').replace(/\/\*(.*?)\*\//gs, '').replace(/\#.*$/gm, '');
+        return this;
+    }
+    getImplementedMethods() {
+        let methods = [];
+        //@ts-ignore
+        let matches = this.text.matchAll(/(?<=\s)(((public)|(static)|(protected)|(private)|(final))\s+)*function[^\n;]*\([^\)]*\)[^{\(\)]*(?={)/gs);
+        Array.from(matches).forEach((val) => {
+            //@ts-ignore
+            let func = val[0];
+            methods.push({
+                declaration: func.replace('{', '').trim(),
+                methodName: func.substring(func.indexOf('function') + 8, func.indexOf('(')).trim()
+            });
+        });
+        return methods;
+    }
+    getAbstractMethods() {
+        let methods = [];
+        //@ts-ignore
+        let matches = this.text.getText().matchAll(/(?<=\s)(((public)|(static)|(protected)|(private)|(abstract))\s+)*function[^\n;]*\([^\)]*\)[\s\:\w]*(?=;)/gs);
+        Array.from(matches).forEach((val) => {
+            //@ts-ignore
+            let func = val[0];
+            methods.push({
+                declaration: func.replace('abstract', '').trim().replace('  ', ' '),
+                methodName: func.substring(func.indexOf('function') + 8, func.indexOf('(')).trim()
+            });
+        });
+        return methods;
+    }
+    formatNamespace(namespace) {
+        while (namespace.indexOf("\\\\") !== -1) {
+            namespace = namespace.replace("\\\\", "\\");
+        }
+        return namespace;
+    }
+}
+exports.PHPFileText = PHPFileText;
+class PHPFile {
+    constructor(filepath) {
+        this.filepath = filepath.replace(/\\/g, '/');
+        while (this.filepath.indexOf('//') !== -1) {
+            this.filepath = this.filepath.replace(/\/\//g, '/');
+        }
+    }
+    async getText() {
+        const file = vscode.Uri.file(this.filepath);
+        return new PHPFileText(await vscode.workspace.fs.readFile(file).then((data) => data.toString()));
+    }
+    static fromNamespace(namespace) {
+        let filepath = EnvironmentInfo.workspaceFolder + "/" + namespace + '.php';
+        return new PHPFile(filepath);
+    }
+    static fromVsCodeFile(file) {
+        return new PHPFile(file.fsPath);
+    }
+}
+exports.PHPFile = PHPFile;
 let composerPaths = new ComposerPaths();
 let manualPaths = {};
 let useComposer;
@@ -28,32 +180,30 @@ let composerJsonPath;
  */
 function activate(context) {
     function setEditor() {
+        var _a;
         if (vscode.window.activeTextEditor !== undefined) {
-            editor = vscode.window.activeTextEditor;
-            doc = editor.document;
+            EnvironmentInfo.editor = vscode.window.activeTextEditor;
+            EnvironmentInfo.doc = EnvironmentInfo.editor.document;
+            //@ts-ignore
+            EnvironmentInfo.workspaceFolder = (_a = vscode.workspace.getWorkspaceFolder(EnvironmentInfo.doc.uri)) === null || _a === void 0 ? void 0 : _a.uri.fsPath;
         }
     }
     async function refreshComposerPaths(newComposerJsonPath) {
-        if (doc === undefined || editor === undefined) {
+        if (!EnvironmentInfo.isDefined()) {
             vscode.window.showErrorMessage('The editor window is not opened. Failed executing command.');
             return;
         }
-        let workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri);
-        if (!workspaceFolder)
-            return;
-        workspaceFolder = workspaceFolder.uri.fsPath;
-        let filepath = workspaceFolder + '/' + newComposerJsonPath + '/' + 'composer.json';
-        filepath = filepath.replace(/\/\//g, '/');
-        let file = vscode.Uri.file(filepath);
+        let filepath = EnvironmentInfo.workspaceFolder + '/' + newComposerJsonPath + '/' + 'composer.json';
+        let file = new PHPFile(filepath);
         let text;
         try {
-            text = await vscode.workspace.fs.readFile(file).then((data) => data.toString());
+            text = await file.getText();
         }
         catch (e) {
             vscode.window.showErrorMessage(`File at path \"${filepath}\" not found! Make sure you specified correct "php-implementor.composerPath" option in your ".vscode/settings.json".`);
             throw e;
         }
-        const composerConfigs = JSON.parse(text);
+        const composerConfigs = JSON.parse(text.getText());
         composerPaths.clear();
         if (composerConfigs) {
             if (composerConfigs.autoload) {
@@ -71,10 +221,8 @@ function activate(context) {
                 }
                 let composerPackageConfigs;
                 for (let composerPackage in composerPackages) {
-                    filepath = workspaceFolder + '/' + vendorDir + '/' + composerPackage + '/' + 'composer.json';
-                    filepath = filepath.replace(/\/\//g, '/');
-                    file = vscode.Uri.file(filepath);
-                    composerPackageConfigs = JSON.parse(await vscode.workspace.fs.readFile(file).then((data) => data.toString()));
+                    file = new PHPFile(EnvironmentInfo.workspaceFolder + '/' + vendorDir + '/' + composerPackage + '/' + 'composer.json');
+                    composerPackageConfigs = JSON.parse((await file.getText()).getText());
                     if (composerPackageConfigs && composerPackageConfigs.autoload) {
                         if (composerPackageConfigs.autoload['psr-4']) {
                             let rootNamespaces = composerPaths.rootNamespaces;
@@ -89,9 +237,9 @@ function activate(context) {
                             composerPackageConfigs.autoload['classmap'] = composerPackageConfigs.autoload['classmap'].map(el => (vendorDir + '/' + composerPackage + '/' + el).replace(/\/\//g, '/'));
                             filepath = (vendorDir + '/' + composerPackage).replace(/\/\//g, '/');
                             const packagePhpFile = (await vscode.workspace.findFiles(filepath + '/src/*.php'))[0];
-                            file = vscode.Uri.file(packagePhpFile.path);
-                            const packagePhpFileText = await vscode.workspace.fs.readFile(file).then((data) => data.toString());
-                            const rootNamespace = getNamespaceOfFile(packagePhpFileText);
+                            file = PHPFile.fromVsCodeFile(packagePhpFile);
+                            const packagePhpFileText = await file.getText();
+                            const rootNamespace = packagePhpFileText.getNamespace();
                             composerPaths.classmap[rootNamespace] = composerPackageConfigs.autoload['classmap'];
                         }
                     }
@@ -129,12 +277,12 @@ function activate(context) {
     setEditor();
     setConfiguration();
     let implementCommand = vscode.commands.registerCommand('php-implementor.implement', async function () {
-        if (doc === undefined || editor === undefined) {
+        if (!EnvironmentInfo.isDefined()) {
             vscode.window.showErrorMessage('The editor window is not opened. Failed executing command.');
             return;
         }
-        let offset = doc.offsetAt(editor.selection.active);
-        let pos = doc.positionAt(offset + 1);
+        let offset = EnvironmentInfo.doc.offsetAt(EnvironmentInfo.editor.selection.active);
+        let pos = EnvironmentInfo.doc.positionAt(offset + 1);
         insertSnippet(pos);
     });
     let refreshCommand = vscode.commands.registerCommand('php-implementor.refreshComposerAutoloads', async function () {
@@ -147,7 +295,8 @@ function activate(context) {
 }
 async function insertSnippet(pos) {
     let text = "";
-    getAllParents(removeCommentsFromText(doc.getText())).then(parents => {
+    let currentFileText = new PHPFileText(EnvironmentInfo.doc.getText());
+    currentFileText.getAllParents().then(parents => {
         let methods = [];
         parents.forEach(parent => {
             parent.methods.forEach(method => {
@@ -161,141 +310,20 @@ async function insertSnippet(pos) {
         }).then(pickedMethods => {
             if (pickedMethods === undefined)
                 return;
-            editor.insertSnippet(new vscode.SnippetString("\n"), pos);
-            let offset = doc.offsetAt(editor.selection.active.with(editor.selection.active.line + 1, 0));
-            pos = doc.positionAt(offset);
+            EnvironmentInfo.editor.insertSnippet(new vscode.SnippetString("\n"), pos);
+            let offset = EnvironmentInfo.doc.offsetAt(EnvironmentInfo.editor.selection.active.with(EnvironmentInfo.editor.selection.active.line + 1, 0));
+            pos = EnvironmentInfo.doc.positionAt(offset);
             pickedMethods.forEach(method => {
                 text += "\n\t" + method + "\n\t{\n\t\tthrow new \\Exception(\"Method not implemented\");\n\t}\n\t";
             });
-            editor.insertSnippet(new vscode.SnippetString(text.replace(/\$/g, '\\$')), pos);
+            EnvironmentInfo.editor.insertSnippet(new vscode.SnippetString(text.replace(/\$/g, '\\$')), pos);
             vscode.window.showInformationMessage('Implemented ' + pickedMethods.length + ' methods!');
         });
     });
     return;
 }
-async function getAllParents(text, result = []) {
-    let eI = text.indexOf('extends');
-    let impI = text.indexOf('implements');
-    if (eI === -1 && impI === -1)
-        return result;
-    let parents = [];
-    if (eI !== -1) {
-        let classes = text.substring(eI + 7, impI !== -1 ? impI : text.indexOf("{", eI)).trim();
-        while (classes.indexOf(' ') !== -1) {
-            classes = classes.replace(/ /g, '');
-        }
-        classes = classes.split(',');
-        classes.forEach(($class) => {
-            parents.push(getClassWithNamespace($class, text));
-        });
-    }
-    if (impI !== -1) {
-        let interfaces = text.substring(impI + 10, text.indexOf("{", impI)).trim();
-        while (interfaces.indexOf(' ') !== -1) {
-            interfaces = interfaces.replace(/ /g, '');
-        }
-        interfaces = interfaces.split(',');
-        interfaces.forEach(($interface) => {
-            parents.push(getClassWithNamespace($interface, text));
-        });
-    }
-    for (const parent of parents) {
-        let parentText = await getFileText(parent);
-        await getAllParents(parentText, result);
-        result.push({
-            parent: parent,
-            methods: getAbstractMethods(parentText)
-        });
-    }
-    let implementedMethods = getImplementedMethods(text);
-    result.forEach((parent, resultIndex) => {
-        result[resultIndex].methods = parent.methods.filter((method) => {
-            return implementedMethods.find(val => method.methodName == val.methodName) === undefined;
-        });
-    });
-    result = result.filter(parent => parent.methods.length > 0);
-    return result;
-}
-function getClassWithNamespace(className, text) {
-    let match = null;
-    let matches;
-    if (className.indexOf('\\') !== -1) {
-        match = className;
-        if (match.indexOf("\\") === 0) {
-            match = match.replace("\\", '');
-        }
-        let namespace = match.substring(0, match.lastIndexOf("\\"));
-        if (namespace.indexOf('namespace') === 0) {
-            match = match.replace(namespace, namespace.replace('namespace', getNamespaceOfFile(text)));
-        }
-        else {
-            let regExp = `(?<=use)[^;]+${namespace}\\s*(?=;)`;
-            matches = text.match(new RegExp(regExp, "gs"));
-            if (matches) {
-                match = match.replace(namespace, matches[0].trim());
-            }
-        }
-    }
-    else {
-        let regExp = `(?<=use)[^;]+[\\s]+(?=as[\\s]+${className};)`;
-        matches = text.match(new RegExp(regExp, "gs"));
-        if (!matches) {
-            matches = text.match(new RegExp(`(?<=use)[\\s]+[^;]+${className}(?=;)`, "gs"));
-        }
-        if (matches) {
-            match = matches[0];
-        }
-    }
-    if (!match)
-        match = getNamespaceOfFile(text) + "\\" + className;
-    else
-        match = match.trim();
-    match = formatNamespace(match);
-    return match;
-}
-function getNamespaceOfFile(text) {
-    let nI = text.indexOf('namespace');
-    let namespace = text.substring(nI + 9, text.indexOf(";", nI)).trim();
-    return namespace;
-}
-function formatNamespace(namespace) {
-    while (namespace.indexOf("\\\\") !== -1) {
-        namespace = namespace.replace("\\\\", "\\");
-    }
-    return namespace;
-}
-function getImplementedMethods(text) {
-    let methods = [];
-    //@ts-ignore
-    let matches = text.matchAll(/(?<=\s)(((public)|(static)|(protected)|(private)|(final))\s+)*function[^\n;]*\([^\)]*\)[^{\(\)]*(?={)/gs);
-    Array.from(matches).forEach((val) => {
-        //@ts-ignore
-        let func = val[0];
-        methods.push({
-            declaration: func.replace('{', '').trim(),
-            methodName: func.substring(func.indexOf('function') + 8, func.indexOf('(')).trim()
-        });
-    });
-    return methods;
-}
-function getAbstractMethods(text) {
-    let methods = [];
-    //@ts-ignore
-    let matches = text.matchAll(/(?<=\s)(((public)|(static)|(protected)|(private)|(abstract))\s+)*function[^\n;]*\([^\)]*\)[\s\:\w]*(?=;)/gs);
-    Array.from(matches).forEach((val) => {
-        //@ts-ignore
-        let func = val[0];
-        methods.push({
-            declaration: func.replace('abstract', '').trim().replace('  ', ' '),
-            methodName: func.substring(func.indexOf('function') + 8, func.indexOf('(')).trim()
-        });
-    });
-    return methods;
-}
 async function getFileText(namespace) {
     let text;
-    //@ts-ignore
-    let workspaceFolder = vscode.workspace.getWorkspaceFolder(doc.uri).uri.fsPath;
     let paths = getPaths();
     let classmap = paths instanceof ComposerPaths ? paths.classmap : {};
     let pathFound = false;
@@ -310,10 +338,7 @@ async function getFileText(namespace) {
     }
     let file, filepath;
     if (pathFound) {
-        namespace = namespace.replace(/\\/g, "/").replace(/\/\//g, '/');
-        filepath = workspaceFolder + "/" + namespace + '.php';
-        filepath = filepath.replace(/\/\//g, '/');
-        file = vscode.Uri.file(filepath);
+        file = PHPFile.fromNamespace(namespace);
     }
     else {
         for (let classmapRoot in classmap) {
@@ -322,10 +347,10 @@ async function getFileText(namespace) {
             if (namespace.match(new RegExp(reg, 'gs'))) {
                 const foundFiles = await vscode.workspace.findFiles(`${classmap[classmapRoot]}**/${filename}.php`);
                 for (let foundFile of foundFiles) {
-                    const fileText = await vscode.workspace.fs.readFile(foundFile).then((data) => data.toString());
-                    const fileNamespace = getNamespaceOfFile(fileText);
+                    const fileText = await PHPFile.fromVsCodeFile(foundFile).getText();
+                    const fileNamespace = fileText.getNamespace();
                     if (fileNamespace == namespace.substr(0, namespace.lastIndexOf('\\'))) {
-                        file = foundFile;
+                        file = PHPFile.fromVsCodeFile(foundFile);
                         break;
                     }
                 }
@@ -337,7 +362,7 @@ async function getFileText(namespace) {
         if (file === undefined) {
             throw new Error();
         }
-        text = await vscode.workspace.fs.readFile(file).then((data) => data.toString());
+        text = await file.getText();
     }
     catch (e) {
         let message;
@@ -350,19 +375,18 @@ async function getFileText(namespace) {
         vscode.window.showErrorMessage(`File at path \"${filepath}\" not found! ${message}`);
         throw e;
     }
-    return removeCommentsFromText(text);
-}
-function removeCommentsFromText(text) {
-    return text.replace(/\/\/.*$/gm, '').replace(/\/\*(.*?)\*\//gs, '').replace(/\#.*$/gm, '');
+    return text.removeCommentsFromText();
 }
 function getPaths() {
     return useComposer ? composerPaths : manualPaths;
 }
-// this method is called when your extension is deactivated
 function deactivate() { }
 module.exports = {
     activate,
     deactivate,
-    ComposerPaths
+    ComposerPaths,
+    PHPFile,
+    PHPFileText,
+    EnvironmentInfo
 };
 //# sourceMappingURL=extension.js.map
