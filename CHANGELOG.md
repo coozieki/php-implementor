@@ -1,8 +1,17 @@
 # Change Log
 
+## [1.6.1]
+### Changed 
+- Migrated to Typescript from Javascript
+
+### Fixed
+- Fixed error messages
+
+
 ## [1.6.0]
 ### Added
 - Insert snippets at current cursor position
+
 ### Changed
 - Changed error messages
 
@@ -17,6 +26,7 @@
 ## [1.4.0] - [1.4.1]
 ### Added
 - An option to import `composer.json` autoload paths instead of manually writing it in `php-implementor.autoloads`
+
 ### Fixed
 - Bugs with comments preventing correct parsing of php files
 - Other minor bug fixes
