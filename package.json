@@ -2,7 +2,7 @@
 	"name": "php-implementor",
 	"displayName": "PHP Implementor",
 	"description": "Implement your php interfaces/abstract classes faster",
-	"version": "1.6.0",
+	"version": "1.6.1",
 	"publisher": "coozieki",
 	"icon": "images/php_icon.png",
 	"repository": {
