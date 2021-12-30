@@ -41,7 +41,7 @@ class PHPFileText {
             }
             let namespace = match.substring(0, match.lastIndexOf("\\"));
             if (namespace.indexOf('namespace') === 0) {
-                match = match.replace(namespace, namespace.replace('namespace', this.text));
+                match = match.replace(namespace, namespace.replace('namespace', this.getNamespace()));
             }
             else {
                 let regExp = `(?<=use)[^;]+${namespace}\\s*(?=;)`;
@@ -96,7 +96,7 @@ class PHPFileText {
         }
         for (const parent of parents) {
             let parentText = await getFileText(parent);
-            await this.getAllParents(result);
+            await parentText.getAllParents(result);
             result.push({
                 parent: parent,
                 methods: parentText.getAbstractMethods()
@@ -132,7 +132,7 @@ class PHPFileText {
     getAbstractMethods() {
         let methods = [];
         //@ts-ignore
-        let matches = this.text.getText().matchAll(/(?<=\s)(((public)|(static)|(protected)|(private)|(abstract))\s+)*function[^\n;]*\([^\)]*\)[\s\:\w]*(?=;)/gs);
+        let matches = this.text.matchAll(/(?<=\s)(((public)|(static)|(protected)|(private)|(abstract))\s+)*function[^\n;]*\([^\)]*\)[\s\:\w]*(?=;)/gs);
         Array.from(matches).forEach((val) => {
             //@ts-ignore
             let func = val[0];
@@ -238,7 +238,7 @@ function activate(context) {
                             filepath = (vendorDir + '/' + composerPackage).replace(/\/\//g, '/');
                             const packagePhpFile = (await vscode.workspace.findFiles(filepath + '/src/*.php'))[0];
                             file = PHPFile.fromVsCodeFile(packagePhpFile);
-                            const packagePhpFileText = await file.getText();
+                            const packagePhpFileText = (await file.getText()).removeCommentsFromText();
                             const rootNamespace = packagePhpFileText.getNamespace();
                             composerPaths.classmap[rootNamespace] = composerPackageConfigs.autoload['classmap'];
                         }
@@ -296,6 +296,7 @@ function activate(context) {
 async function insertSnippet(pos) {
     let text = "";
     let currentFileText = new PHPFileText(EnvironmentInfo.doc.getText());
+    currentFileText.removeCommentsFromText();
     currentFileText.getAllParents().then(parents => {
         let methods = [];
         parents.forEach(parent => {
@@ -347,7 +348,7 @@ async function getFileText(namespace) {
             if (namespace.match(new RegExp(reg, 'gs'))) {
                 const foundFiles = await vscode.workspace.findFiles(`${classmap[classmapRoot]}**/${filename}.php`);
                 for (let foundFile of foundFiles) {
-                    const fileText = await PHPFile.fromVsCodeFile(foundFile).getText();
+                    const fileText = (await PHPFile.fromVsCodeFile(foundFile).getText()).removeCommentsFromText();
                     const fileNamespace = fileText.getNamespace();
                     if (fileNamespace == namespace.substr(0, namespace.lastIndexOf('\\'))) {
                         file = PHPFile.fromVsCodeFile(foundFile);
