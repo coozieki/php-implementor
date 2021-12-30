@@ -249,7 +249,7 @@ export class ComposerConfigParser {
     if (this.config['require-dev']) {
       await this.setPackagesComposerPaths(this.config['require-dev']);
     }
-    console.log(this.resultPaths);
+
     return this.resultPaths;
   }
 
@@ -458,7 +458,6 @@ async function getFileText(namespace: string) {
       const filename = namespace.substr(namespace.lastIndexOf('\\') + 1);
       if (namespace.match(new RegExp(reg, 'gs'))) {
         const foundFiles = await vscode.workspace.findFiles(`${classmap[classmapRoot]}**/${filename}.php`);
-        console.log(`${classmap[classmapRoot]}**/${filename}.php`);
         for(let foundFile of foundFiles) {
           const fileText = (await File.fromVsCodeFile(foundFile).getText()).removeCommentsFromText();
           const fileNamespace = fileText.getNamespace();
