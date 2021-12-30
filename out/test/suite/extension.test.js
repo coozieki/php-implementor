@@ -21,19 +21,19 @@ suite('Unit', function () {
     suite('PHPFileTest', () => {
         test('testFromNamespace', () => {
             ext.EnvironmentInfo.workspaceFolder = 'my_folder';
-            const file = ext.PHPFile.fromNamespace('App\\Support\\Class');
+            const file = ext.File.fromNamespace('App\\Support\\Class');
             assert.strictEqual(file.filepath, 'my_folder/App/Support/Class.php');
         });
         test('testFromVsCodeFile', () => {
             const filepath = '/path/to/file';
             const file = vscode.Uri.file(filepath);
-            assert.strictEqual(ext.PHPFile.fromVsCodeFile(file).filepath, filepath);
+            assert.strictEqual(ext.File.fromVsCodeFile(file).filepath, filepath);
         });
     });
     suite('PHPFileTextTest', () => {
         test('testGetNamespace', () => {
             const namespace = 'App\\Support';
-            const text = new ext.PHPFileText(`
+            const text = new ext.FileText(`
         <?php
   
           namespace ${namespace};
@@ -50,7 +50,7 @@ suite('Unit', function () {
   
         die();
     `;
-            assert.strictEqual(text, new ext.PHPFileText(text).getText());
+            assert.strictEqual(text, new ext.FileText(text).getText());
         });
         test('testRemoveCommentsFromText', () => {
             const text = `
@@ -104,7 +104,11 @@ suite('Unit', function () {
         
       }
       
-    `.replace(/\s/g, ''), new ext.PHPFileText(text).removeCommentsFromText().getText().replace(/\s/g, ''));
+    `.replace(/\s/g, ''), new ext.FileText(text).removeCommentsFromText().getText().replace(/\s/g, ''));
+        });
+    });
+    suite('ComposerConfigParserTest', () => {
+        test('testGetAutoloadPaths', () => {
         });
     });
 });
@@ -113,7 +117,7 @@ suite('Integration', () => {
         test('testGetText', async () => {
             //@ts-ignore
             const filepath = __dirname + '/../../../src/test/test_files/Parent1.php';
-            let file = new ext.PHPFile(filepath);
+            let file = new ext.File(filepath);
             assert.strictEqual('Example file text', (await file.getText()).getText());
         });
     });
