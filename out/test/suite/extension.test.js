@@ -107,10 +107,6 @@ suite('Unit', function () {
     `.replace(/\s/g, ''), new ext.FileText(text).removeCommentsFromText().getText().replace(/\s/g, ''));
         });
     });
-    suite('ComposerConfigParserTest', () => {
-        test('testGetAutoloadPaths', () => {
-        });
-    });
 });
 suite('Integration', () => {
     suite('PHPFileTest', () => {

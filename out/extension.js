@@ -95,7 +95,13 @@ class FileText {
             });
         }
         for (const parent of parents) {
-            let parentText = await getFileText(parent);
+            let parentText;
+            try {
+                parentText = await getFileText(parent);
+            }
+            catch {
+                continue;
+            }
             await parentText.getAllParents(result);
             result.push({
                 parent: parent,
@@ -192,7 +198,6 @@ class ComposerConfigParser {
         if (this.config['require-dev']) {
             await this.setPackagesComposerPaths(this.config['require-dev']);
         }
-        console.log(this.resultPaths);
         return this.resultPaths;
     }
     async setPackagesComposerPaths(composerPackages) {
@@ -351,7 +356,7 @@ async function getFileText(namespace) {
             break;
         }
     }
-    let file, filepath;
+    let file;
     if (pathFound) {
         file = File.fromNamespace(namespace);
     }
@@ -361,7 +366,6 @@ async function getFileText(namespace) {
             const filename = namespace.substr(namespace.lastIndexOf('\\') + 1);
             if (namespace.match(new RegExp(reg, 'gs'))) {
                 const foundFiles = await vscode.workspace.findFiles(`${classmap[classmapRoot]}**/${filename}.php`);
-                console.log(`${classmap[classmapRoot]}**/${filename}.php`);
                 for (let foundFile of foundFiles) {
                     const fileText = (await File.fromVsCodeFile(foundFile).getText()).removeCommentsFromText();
                     const fileNamespace = fileText.getNamespace();
@@ -383,12 +387,12 @@ async function getFileText(namespace) {
     catch (e) {
         let message;
         if (useComposer) {
-            message = 'Try to use "php-implementor.refreshComposerAutoloads" command or make sure you specified correct "php-implementor.composerPath" option in your ".vscode/settings.json".';
+            message = 'Try to use Ctrl+Shift+P -> "PHP Implementor: Refresh composer autoloads" command or make sure you specified correct "php-implementor.composerPath" option in your ".vscode/settings.json".';
         }
         else {
-            message = 'Make sure you specified correct root folders in "php-implementor.autoloads" option in your ".vscode/settings.json".';
+            message = 'Make sure you specified correct paths for root namespaces in "php-implementor.autoloads" option in your ".vscode/settings.json".';
         }
-        vscode.window.showErrorMessage(`File at path \"${filepath}\" not found! ${message}`);
+        vscode.window.showErrorMessage(`File for "${namespace}" not found! ${message}`);
         throw e;
     }
     return text.removeCommentsFromText();
