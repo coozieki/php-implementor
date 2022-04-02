@@ -268,8 +268,12 @@ export class ComposerConfigParser {
 
     for (let composerPackage in composerPackages) {
       let file = new File(EnvironmentInfo.workspaceFolder+'/'+vendorDir+'/'+composerPackage+'/'+'composer.json');
-      composerPackageConfigs = JSON.parse((await file.getText()).getText());
-      
+      let composerPackageConfigs
+      try {
+        composerPackageConfigs = JSON.parse((await file.getText()).getText());
+      } catch {
+        continue
+      }
       if (composerPackageConfigs && composerPackageConfigs.autoload) {
         this.setPSR4AutoloadPaths(composerPackageConfigs, vendorDir+'/'+composerPackage);
 

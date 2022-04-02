@@ -1,5 +1,9 @@
 # Change Log
 
+## [1.6.2]
+### Fixed
+- Fixed bug with composer.json
+
 ## [1.6.1]
 ### Changed 
 - Migrated to Typescript from Javascript
